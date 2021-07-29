@@ -3,26 +3,32 @@
  */
 
 package akka.persistence.spanner.state.scaladsl
+
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.util.Try
-
-import akka.{Done, NotUsed}
+import akka.Done
+import akka.NotUsed
 import akka.actor.ExtendedActorSystem
 import akka.pattern.ask
 import akka.util.ByteString
-import akka.persistence.state.scaladsl.{DurableStateUpdateStore, GetObjectResult}
-import akka.persistence.query.{DurableStateChange, Offset}
+import akka.persistence.state.scaladsl.DurableStateUpdateStore
+import akka.persistence.state.scaladsl.GetObjectResult
+import akka.persistence.query.DurableStateChange
+import akka.persistence.query.Offset
 import akka.persistence.query.scaladsl.DurableStateStoreQuery
 import akka.persistence.spanner.SpannerObjectStore
 import akka.persistence.typed.PersistenceId
-import akka.serialization.{Serialization, Serializers}
-import akka.stream.scaladsl.{Sink, Source}
-import akka.stream.{Materializer, SystemMaterializer}
+import akka.serialization.Serialization
+import akka.serialization.Serializers
+import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.Source
+import akka.stream.Materializer
+import akka.stream.SystemMaterializer
 import akka.util.Timeout
 
 object SpannerDurableStateStore {
-  val Identifier = "spanner-durable-state-store"
+  val Identifier = "akka.persistence.spanner.durable-state-store"
 }
 
 class SpannerDurableStateStore[A](
@@ -95,7 +101,7 @@ class SpannerDurableStateStore[A](
     serialized.map(payload => (ByteString(payload), serializer.identifier, serManifest))
   }
 
-  private def deserialize[R](bytes: Array[Byte], serId: Int, serManifest: String) =
+  private def deserialize(bytes: Array[Byte], serId: Int, serManifest: String) =
     serialization
       .deserialize(
         bytes,

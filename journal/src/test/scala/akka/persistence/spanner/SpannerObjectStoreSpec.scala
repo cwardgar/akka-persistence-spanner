@@ -117,7 +117,7 @@ class SpannerObjectStoreSpec extends SpannerSpec("SpannerObjectStoreSpec") {
 
       val changes2 = spannerInteractions.currentChanges(entityType, change1.offset).runWith(Sink.seq).futureValue
       changes2 should have size 1
-      changes2.head should be(expectedChange2)
+      changes2.head.copy(timestamp = 0L) should be(expectedChange2)
 
       val value3 = ByteString("Genuine and Sincere in all Communications")
       spannerInteractions.upsertObject(entityType, persistenceId1, serId, serManifest, value3, seqNr = 2L).futureValue
