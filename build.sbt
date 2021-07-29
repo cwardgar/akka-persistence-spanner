@@ -27,7 +27,9 @@ inThisBuild(
     resolvers ++=
       (if (System.getProperty("override.akka.version") != null)
          Seq("Akka Snapshots".at("https://repo.akka.io/snapshots/"))
-       else Seq.empty)
+       else Seq.empty),
+    // FIXME remove switching to final Akka version
+    resolvers += "Akka Snapshots".at("https://oss.sonatype.org/content/repositories/snapshots/")
   )
 )
 
