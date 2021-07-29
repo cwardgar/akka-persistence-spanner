@@ -96,7 +96,8 @@ object SpannerObjectStore {
       serId: Long,
       serManifest: String,
       seqNr: Long,
-      offset: Offset
+      offset: Offset,
+      timestamp: Long
   )
 
   def apply()(implicit system: ActorSystem): SpannerObjectStore = {

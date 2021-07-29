@@ -84,7 +84,7 @@ class SpannerDurableStateStore[A](
       // to Int: Spanner only has INT64
       value = deserialize(change.bytes.toArray, change.serId.asInstanceOf[Int], change.serManifest).get, // crash source if corrupt.
       offset = change.offset,
-      timestamp = 0L // TODO change.timestamp
+      timestamp = change.timestamp
     )
 
   private def serialize(payload: Any): Try[(ByteString, Int, String)] = {

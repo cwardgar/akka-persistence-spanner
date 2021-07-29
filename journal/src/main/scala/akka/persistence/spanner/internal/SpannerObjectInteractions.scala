@@ -302,7 +302,8 @@ private[spanner] final class SpannerObjectInteractions(
           serId = obj.serId,
           serManifest = obj.serManifest,
           seqNr = obj.sequenceNr,
-          offset = offset
+          offset = offset,
+          timestamp = SpannerUtils.spannerTimestampToUnixMillis(obj.writeTime)
         )
 
       val obj = Objects.deserializeRow(row)
