@@ -32,10 +32,12 @@ class SpannerDurableStateStoreSpec extends SpannerSpec("SpannerDurableStateStore
       store.upsertObject(persistenceId, 1L, value, tag).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
     }
+
     "produce None when fetching a non-existing key" in {
       val key = PersistenceId(entityType, "nonexistent-id").id
       store.getObject(key).futureValue should be(GetObjectResult(None, 0L))
     }
+
     "update a value" in {
       val persistenceId = PersistenceId(entityType, "id-to-be-updated").id
       val value = "Genuinely Collaborative"
@@ -44,10 +46,9 @@ class SpannerDurableStateStoreSpec extends SpannerSpec("SpannerDurableStateStore
 
       val updatedValue = "Open to Feedback"
       store.upsertObject(persistenceId, 2L, updatedValue, tag).futureValue
-      store.getObject(persistenceId).futureValue should be(
-        be(GetObjectResult(Some(updatedValue), 2L))
-      )
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(updatedValue), 2L))
     }
+
     "support deletions" in {
       val persistenceId = PersistenceId(entityType, "to-be-added-and-removed").id
       val value = "Genuinely Collaborative"
@@ -98,6 +99,7 @@ class SpannerDurableStateStoreSpec extends SpannerSpec("SpannerDurableStateStore
       change3.revision should be(2L)
       change3.value should be(value3)
     }
+
     "support continuous changes query" in {
       val entityType = "continuous-changes"
       val tag = "continous-changes-1"
