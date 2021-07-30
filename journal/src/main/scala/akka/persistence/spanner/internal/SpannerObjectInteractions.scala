@@ -40,6 +40,7 @@ object SpannerObjectInteractions {
            |  ser_manifest STRING(MAX) NOT NULL,
            |  sequence_nr INT64 NOT NULL,
            |  write_time TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true),
+           |  tag STRING(MAX) NOT NULL
            |) PRIMARY KEY (persistence_id)""".stripMargin
 
       def objectsByTypeOffsetIndex(settings: SpannerSettings): String = objectsByTypeOffsetIndex(settings.objectTable)
@@ -47,6 +48,14 @@ object SpannerObjectInteractions {
         s"""CREATE INDEX ${table}_type_and_offset
            |ON $table (
            |  entity_type,
+           |  write_time
+           |)""".stripMargin
+
+      def objectsByTagOffsetIndex(settings: SpannerSettings): String = objectsByTagOffsetIndex(settings.objectTable)
+      def objectsByTagOffsetIndex(table: String): String =
+        s"""CREATE INDEX ${table}_tag_and_offset
+           |ON $table (
+           |  tag,
            |  write_time
            |)""".stripMargin
 
@@ -59,8 +68,9 @@ object SpannerObjectInteractions {
       val SerManifest = "ser_manifest" -> TypeCode.STRING
       val SeqNr = "sequence_nr" -> TypeCode.INT64
       val WriteTime = "write_time" -> TypeCode.TIMESTAMP
+      val Tag = "tag" -> TypeCode.STRING
 
-      val Columns = List(EntityType, PersistenceId, SerId, SerManifest, Value, SeqNr, WriteTime)
+      val Columns = List(EntityType, PersistenceId, SerId, SerManifest, Value, SeqNr, WriteTime, Tag)
 
       /** For use in queries: */
       val OldSeqNr = "old_sequence_nr" -> TypeCode.INT64
@@ -73,11 +83,12 @@ object SpannerObjectInteractions {
           serId: Long,
           serManifest: String,
           sequenceNr: Long,
-          writeTime: String
+          writeTime: String,
+          tag: String
       )
       def deserializeRow(row: Seq[struct.Value]): ObjectRow =
         row match {
-          case Seq(entityType, persistenceId, serId, serManifest, value, sequenceNr, writeTime) =>
+          case Seq(entityType, persistenceId, serId, serManifest, value, sequenceNr, writeTime, tag) =>
             ObjectRow(
               entityType = entityType.getStringValue,
               persistenceId = persistenceId.getStringValue,
@@ -85,7 +96,8 @@ object SpannerObjectInteractions {
               serId = serId.getStringValue.toLong,
               serManifest = serManifest.getStringValue,
               sequenceNr = sequenceNr.getStringValue.toLong,
-              writeTime = writeTime.getStringValue
+              writeTime = writeTime.getStringValue,
+              tag = tag.getStringValue
             )
         }
     }
@@ -110,7 +122,7 @@ private[spanner] final class SpannerObjectInteractions(
 
   val SqlUpdate =
     s"UPDATE ${settings.objectTable} SET value = @value, ser_id = @ser_id, ser_manifest = @ser_manifest, " +
-    s"sequence_nr = @new_sequence_nr, write_time = PENDING_COMMIT_TIMESTAMP() " +
+    s"sequence_nr = @new_sequence_nr, write_time = PENDING_COMMIT_TIMESTAMP(), tag = @tag " +
     s"WHERE persistence_id = @persistence_id AND sequence_nr = @old_sequence_nr"
   val SqlUpdateTypes: Map[String, TypeCode] =
     List(
@@ -119,7 +131,8 @@ private[spanner] final class SpannerObjectInteractions(
       Objects.SerManifest,
       Objects.NewSeqNr,
       Objects.PersistenceId,
-      Objects.OldSeqNr
+      Objects.OldSeqNr,
+      Objects.Tag
     ).toMap
 
   /**
@@ -131,14 +144,25 @@ private[spanner] final class SpannerObjectInteractions(
       serId: Long,
       serManifest: String,
       value: ByteString,
-      seqNr: Long
+      seqNr: Long,
+      tag: String
   ): Future[Unit] = {
     require(seqNr > 0, "Sequence number should start at 1")
     spannerGrpcClient.withSession(session => {
-      if (seqNr == 1) insertFirst(entity, persistenceId, serId, serManifest, value, seqNr, session)
-      else update(entity, persistenceId, serId, serManifest, value, seqNr, session)
+      if (seqNr == 1) insertFirst(entity, persistenceId, serId, serManifest, value, seqNr, tag, session)
+      else update(entity, persistenceId, serId, serManifest, value, seqNr, tag, session)
     })
   }
+
+  def upsertObject(
+      entity: String,
+      persistenceId: PersistenceId,
+      serId: Long,
+      serManifest: String,
+      value: ByteString,
+      seqNr: Long
+  ): Future[Unit] =
+    upsertObject(entity, persistenceId, serId, serManifest, value, seqNr, "")
 
   private object CommitTimestamp
 
@@ -149,6 +173,7 @@ private[spanner] final class SpannerObjectInteractions(
       serManifest: String,
       value: ByteString,
       seqNr: Long,
+      tag: String,
       session: SessionPool.PooledSession
   ) =
     spannerGrpcClient
@@ -167,6 +192,7 @@ private[spanner] final class SpannerObjectInteractions(
                   case Objects.SeqNr => wrapValue(Objects.SeqNr, seqNr)
                   case Objects.Value => wrapValue(Objects.Value, value)
                   case Objects.WriteTime => wrapValue(Objects.WriteTime, CommitTimestamp)
+                  case Objects.Tag => wrapValue(Objects.Tag, tag)
                   case other => throw new MatchError(other)
                 }))
               )
@@ -191,6 +217,7 @@ private[spanner] final class SpannerObjectInteractions(
       serManifest: String,
       value: ByteString,
       seqNr: Long,
+      tag: String,
       session: SessionPool.PooledSession
   ): Future[Unit] =
     spannerGrpcClient
@@ -204,6 +231,7 @@ private[spanner] final class SpannerObjectInteractions(
             case Objects.Value => wrapNameValue(Objects.Value, value)
             case Objects.OldSeqNr => wrapNameValue(Objects.OldSeqNr, seqNr - 1)
             case Objects.NewSeqNr => wrapNameValue(Objects.NewSeqNr, seqNr)
+            case Objects.Tag => wrapNameValue(Objects.Tag, tag)
             case other => throw new MatchError(other)
           }), SqlUpdateTypes.mapValues(Type(_)).toMap)
         )
@@ -337,6 +365,42 @@ private[spanner] final class SpannerObjectInteractions(
       initialOffset,
       nextOffset,
       offset => Some(currentChanges(entityType, offset)),
+      1, // the same row comes back and is filtered due to how the offset works
+      settings.querySettings.refreshInterval
+    )
+  }
+
+  @ApiMayChange
+  def currentChangesByTag(tag: String, offset: Offset): Source[Change, NotUsed] = {
+    val spannerOffset = SpannerUtils.toSpannerOffset(offset)
+    spannerGrpcClient
+      .streamingQuery(
+        ObjectChangesSql,
+        params = Some(
+          Struct(
+            Map(
+              "tag" -> Value(StringValue(tag)),
+              "write_time" -> Value(StringValue(spannerOffset.commitTimestamp))
+            )
+          )
+        ),
+        paramTypes = Map("tag" -> Type(TypeCode.STRING), "write_time" -> Type(TypeCode.TIMESTAMP))
+      )
+      .statefulMapConcat(deserializeAndAddOffset(spannerOffset))
+      .mapMaterializedValue(_ => NotUsed)
+  }
+
+  @ApiMayChange
+  def changesByTag(tag: String, offset: Offset): Source[Change, NotUsed] = {
+    val initialOffset = SpannerUtils.toSpannerOffset(offset)
+
+    def nextOffset(previousOffset: SpannerOffset, change: Change): SpannerOffset =
+      change.offset.asInstanceOf[SpannerOffset]
+
+    ContinuousQuery[SpannerOffset, Change](
+      initialOffset,
+      nextOffset,
+      offset => Some(currentChangesByTag(tag, offset)),
       1, // the same row comes back and is filtered due to how the offset works
       settings.querySettings.refreshInterval
     )

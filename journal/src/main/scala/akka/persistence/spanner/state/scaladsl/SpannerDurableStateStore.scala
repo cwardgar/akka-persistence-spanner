@@ -63,7 +63,7 @@ class SpannerDurableStateStore[A](
         serialize(value)
       )
       _ <- spannerObjectStore.upsertObject(
-        tag, // tag is used as entityType in spanner store
+        "", // cannot extract entityType from persistenceId.
         PersistenceId.ofUniqueId(persistenceId),
         serId,
         serManifest,
@@ -76,12 +76,10 @@ class SpannerDurableStateStore[A](
     spannerObjectStore.deleteObject(PersistenceId.ofUniqueId(persistenceId)).map(_ => Done)
 
   def currentChanges(tag: String, offset: Offset): Source[DurableStateChange[A], NotUsed] =
-    // tag == entityType in spanner store
-    spannerObjectStore.currentChanges(tag, offset).map(change => toDurableStateChange(change))
+    spannerObjectStore.currentChangesByTag(tag, offset).map(change => toDurableStateChange(change))
 
   def changes(tag: String, offset: Offset): Source[DurableStateChange[A], NotUsed] =
-    // tag == entityType in spanner store
-    spannerObjectStore.changes(tag, offset).map(change => toDurableStateChange(change))
+    spannerObjectStore.changesByTag(tag, offset).map(change => toDurableStateChange(change))
 
   private def toDurableStateChange(change: SpannerObjectStore.Change) =
     new DurableStateChange[A](
