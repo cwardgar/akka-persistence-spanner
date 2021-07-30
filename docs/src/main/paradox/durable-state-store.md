@@ -62,4 +62,4 @@ You will need to have created the instance and database.
 ### Deletes
 
 The durable state store supports deletes through hard deletes, which means the durable state store entries are actually deleted from the database. 
-There is no materialized view with a copy of the event so if an event that is tagged is deleted it will no longer show up in changes by tag queries.
+There is no materialized view with a copy of the state so if a state that is tagged is deleted it will no longer show up in changes by tag queries.
