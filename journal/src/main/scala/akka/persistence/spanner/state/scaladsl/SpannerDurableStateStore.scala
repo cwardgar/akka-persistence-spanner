@@ -45,7 +45,7 @@ class SpannerDurableStateStore[A](
             deserialized <- Future
               .fromTry(
                 // to Int: Spanner only has INT64
-                deserialize(r.byteString.toArray, r.serId.asInstanceOf[Int], r.serManifest)
+                deserialize(r.byteString.toArray, r.serId.toInt, r.serManifest)
               )
           } yield {
             GetObjectResult(
@@ -88,7 +88,7 @@ class SpannerDurableStateStore[A](
       persistenceId = change.persistenceId,
       revision = change.seqNr,
       // to Int: Spanner only has INT64
-      value = deserialize(change.bytes.toArray, change.serId.asInstanceOf[Int], change.serManifest).get, // crash source if corrupt.
+      value = deserialize(change.bytes.toArray, change.serId.toInt, change.serManifest).get, // crash source if corrupt.
       offset = change.offset,
       timestamp = change.timestamp
     )
