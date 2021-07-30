@@ -54,7 +54,7 @@ class SpannerDurableStateStoreSpec extends SpannerSpec("SpannerDurableStateStore
       store.upsertObject(persistenceId, 1L, value, tag).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
       store.deleteObject(persistenceId).futureValue
-      store.getObject(persistenceId).futureValue should be(None)
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 0L))
     }
 
     "support querying for current changes" in {
@@ -91,9 +91,9 @@ class SpannerDurableStateStoreSpec extends SpannerSpec("SpannerDurableStateStore
       val value3 = "Genuine and Sincere in all Communications"
       store.upsertObject(persistenceId1, 2L, value3, tag).futureValue
 
-      val changes3 = store.currentChanges(tag, change2.offset).runWith(Sink.seq).futureValue
+      val changes3 = store.currentChanges(tag, change22.offset).runWith(Sink.seq).futureValue
       changes3 should have size 1
-      val change3 = changes2.head
+      val change3 = changes3.head
       change3.persistenceId should be(persistenceId1)
       change3.revision should be(2L)
       change3.value should be(value3)
@@ -121,7 +121,7 @@ class SpannerDurableStateStoreSpec extends SpannerSpec("SpannerDurableStateStore
       val value3 = "Genuine and Sincere in all Communications"
       store.upsertObject(persistenceId3, 1L, value3, tag).futureValue
       val change3 = probe.expectNext()
-      change2.persistenceId should be(persistenceId3)
+      change3.persistenceId should be(persistenceId3)
 
       val value4 = "Always prefer Hacks over Well Engineered Solutions"
       store.upsertObject(persistenceId1, 2L, value4, tag).futureValue
