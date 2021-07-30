@@ -297,6 +297,13 @@ private[spanner] final class SpannerObjectInteractions(
        |AND write_time >= @write_time
        |ORDER BY write_time, persistence_id""".stripMargin
 
+  private val ObjectChangesSqlByTag =
+    s"""SELECT ${Objects.Columns.map(_._1).mkString(", ")}
+       |FROM ${settings.objectTable}
+       |WHERE tag = @tag
+       |AND write_time >= @write_time
+       |ORDER BY write_time, persistence_id""".stripMargin
+
   @ApiMayChange
   def currentChanges(entityType: String, offset: Offset): Source[Change, NotUsed] = {
     val spannerOffset = SpannerUtils.toSpannerOffset(offset)
@@ -375,7 +382,7 @@ private[spanner] final class SpannerObjectInteractions(
     val spannerOffset = SpannerUtils.toSpannerOffset(offset)
     spannerGrpcClient
       .streamingQuery(
-        ObjectChangesSql,
+        ObjectChangesSqlByTag,
         params = Some(
           Struct(
             Map(
