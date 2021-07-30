@@ -1,6 +1,6 @@
 # Akka Persistence Spanner Documentation
 
-The Akka Persistence Spanner  plugin allows for using Google Spanner as a backend for Akka Persistence. 
+The Akka Persistence Spanner plugin allows for using Google Spanner as a backend for Akka Persistence. 
 
 @@toc { depth=2 }
 
@@ -11,6 +11,7 @@ The Akka Persistence Spanner  plugin allows for using Google Spanner as a backen
 * [Journal Plugin](journal.md)
 * [Query Plugin](query.md)
 * [Snapshot Plugin](snapshots.md)
+* [Durable State Plugin](durable-state-store.md)
 * [Session Pool](tuning-session-pool.md)
 * [Contributing](contributing.md)
 
