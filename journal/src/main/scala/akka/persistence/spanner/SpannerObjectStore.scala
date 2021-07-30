@@ -109,7 +109,7 @@ class SpannerObjectStore(interactions: SpannerObjectInteractions) {
    */
   @ApiMayChange
   def currentChangesByTag(tag: String, offset: Offset): Source[Change, NotUsed] =
-    interactions.currentChanges(tag, offset)
+    interactions.currentChangesByTag(tag, offset)
 
   /**
    * Get a source of the most recent changes made to objects of the given tag since the passed in offset.
@@ -130,7 +130,7 @@ class SpannerObjectStore(interactions: SpannerObjectInteractions) {
    */
   @ApiMayChange
   def changesByTag(tag: String, offset: Offset): Source[Change, NotUsed] =
-    interactions.changes(tag, offset)
+    interactions.changesByTag(tag, offset)
 }
 
 /**
