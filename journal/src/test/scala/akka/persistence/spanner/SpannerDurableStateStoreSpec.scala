@@ -43,7 +43,7 @@ class SpannerDurableStateStoreSpec extends SpannerSpec("SpannerDurableStateStore
       store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
 
       val updatedValue = "Open to Feedback"
-      store.upsertObject(persistenceId, 1L, updatedValue, tag).futureValue
+      store.upsertObject(persistenceId, 2L, updatedValue, tag).futureValue
       store.getObject(persistenceId).futureValue should be(
         be(GetObjectResult(Some(updatedValue), 2L))
       )
