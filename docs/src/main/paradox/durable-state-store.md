@@ -4,7 +4,7 @@
 
 The following tables need to be created in the configured database:
 
-@@snip [journal-tables](/target/object-tables.txt) { #journal-tables } 
+@@snip [object-tables](/target/object-tables.txt) { #object-tables } 
 
 ## Configuration
 
@@ -61,5 +61,5 @@ You will need to have created the instance and database.
 
 ### Deletes
 
-The journal supports deletes through hard deletes, which means the journal entries are actually deleted from the database. 
-There is no materialized view with a copy of the event so if an event that is tagged is deleted it will no longer show up in events by tag queries.
+The durable state store supports deletes through hard deletes, which means the durable state store entries are actually deleted from the database. 
+There is no materialized view with a copy of the event so if an event that is tagged is deleted it will no longer show up in changes by tag queries.
