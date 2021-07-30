@@ -9,6 +9,7 @@ import akka.persistence.spanner.SpannerSettings.SessionPoolSettings
 import akka.util.JavaDurationConverters._
 import com.typesafe.config.Config
 
+import scala.util.Try
 import scala.concurrent.duration.FiniteDuration
 
 /**
@@ -68,7 +69,8 @@ final class SpannerSettings(config: Config) {
   val snapshotsTable = config.getString("snapshot.table")
 
   // Object store to (eventually) back durable actors
-  val objectTable = config.getString("object.table")
+  val objectTable =
+    Try(config.getString("durable-state-store.table")).toOption.getOrElse(config.getString("object.table"))
 
   val sessionPool = new SessionPoolSettings(config.getConfig("session-pool"))
   val sessionAcquisitionTimeout = config.getDuration("session-acquisition-timeout").asScala
