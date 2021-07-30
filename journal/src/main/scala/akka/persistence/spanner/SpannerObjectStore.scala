@@ -37,6 +37,17 @@ class SpannerObjectStore(interactions: SpannerObjectInteractions) {
       seqNr: Long
   ): Future[Unit] = interactions.upsertObject(entityType, persistenceId, serId, serManifest, value, seqNr)
 
+  @ApiMayChange
+  def upsertObject(
+      entityType: String,
+      persistenceId: PersistenceId,
+      serId: Long,
+      serManifest: String,
+      value: ByteString,
+      seqNr: Long,
+      tag: String
+  ): Future[Unit] = interactions.upsertObject(entityType, persistenceId, serId, serManifest, value, seqNr, tag)
+
   def getObject(persistenceId: PersistenceId): Future[Option[Result]] = interactions.getObject(persistenceId)
 
   def deleteObject(persistenceId: PersistenceId): Future[Unit] = interactions.deleteObject(persistenceId)

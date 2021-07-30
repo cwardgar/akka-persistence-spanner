@@ -68,7 +68,8 @@ class SpannerDurableStateStore[A](
         serId,
         serManifest,
         bytes,
-        revision
+        revision,
+        tag
       )
     } yield Done
 
