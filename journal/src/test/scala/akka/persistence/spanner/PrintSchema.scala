@@ -31,6 +31,8 @@ object PrintSchema {
       pw.println("//#journal-tables")
       pw.println(SpannerJournalInteractions.Schema.Journal.journalTable(settings))
       pw.println("")
+      pw.println(SpannerJournalInteractions.Schema.Journal.sliceIndex(settings))
+      pw.println("")
       pw.println(SpannerJournalInteractions.Schema.Tags.tagTable(settings))
       pw.println("")
       pw.println(SpannerJournalInteractions.Schema.Tags.eventsByTagIndex(settings))

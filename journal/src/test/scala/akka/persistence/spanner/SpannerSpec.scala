@@ -145,9 +145,13 @@ trait SpannerLifecycle
 
   private val pidCounter = new AtomicLong(0)
   def nextPid() = s"p-${pidCounter.incrementAndGet()}"
+  def nextPid(entityTypeHint: String) = s"$entityTypeHint|p-${pidCounter.incrementAndGet()}"
 
   private val tagCounter = new AtomicLong(0)
   def nextTag = s"tag-${tagCounter.incrementAndGet()}"
+
+  private val entityTypeHintCounter = new AtomicLong(0)
+  def nextEntityTypeHint = s"TestEntity-${entityTypeHintCounter.incrementAndGet()}"
 
   val spannerSettings = new SpannerSettings(testKit.system.settings.config.getConfig("akka.persistence.spanner"))
   val grpcSettings: GrpcClientSettings = if (spannerSettings.useAuth) {
@@ -206,7 +210,9 @@ trait SpannerLifecycle
     log.debug("Used settings: {}", spannerSettings)
     log.info("Creating database {}", spannerSettings.database)
 
-    val dbSchemas: List[String] = SpannerJournalInteractions.Schema.Journal.journalTable(spannerSettings) ::
+    val dbSchemas: List[String] =
+      SpannerJournalInteractions.Schema.Journal.journalTable(spannerSettings) ::
+      SpannerJournalInteractions.Schema.Journal.sliceIndex(spannerSettings) ::
       SpannerJournalInteractions.Schema.Tags.tagTable(spannerSettings) ::
       SpannerJournalInteractions.Schema.Tags.eventsByTagIndex(spannerSettings) ::
       SpannerJournalInteractions.Schema.Deleted.deleteMetadataTable(spannerSettings) :: Nil ++

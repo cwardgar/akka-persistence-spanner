@@ -98,6 +98,7 @@ final class SpannerTestkit(systemProvider: ClassicActorSystemProvider) {
             parent = spannerSettings.parent,
             s"CREATE DATABASE ${spannerSettings.database}",
             SpannerJournalInteractions.Schema.Journal.journalTable(spannerSettings) ::
+            SpannerJournalInteractions.Schema.Journal.sliceIndex(spannerSettings) ::
             SpannerJournalInteractions.Schema.Tags.tagTable(spannerSettings) ::
             SpannerJournalInteractions.Schema.Tags.eventsByTagIndex(spannerSettings) ::
             SpannerJournalInteractions.Schema.Deleted.deleteMetadataTable(spannerSettings) ::

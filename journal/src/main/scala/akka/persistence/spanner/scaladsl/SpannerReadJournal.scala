@@ -22,6 +22,7 @@ import akka.persistence.spanner.{SpannerOffset, SpannerSettings}
 import akka.serialization.SerializationExtension
 import akka.stream.scaladsl
 import akka.stream.scaladsl.Source
+import com.google.protobuf.struct.Value.Kind.ListValue
 import com.google.protobuf.struct.Value.Kind.StringValue
 import com.google.protobuf.struct.{Struct, Value}
 import com.google.spanner.v1.{Type, TypeCode}
@@ -55,6 +56,15 @@ final class SpannerReadJournal(system: ExtendedActorSystem, config: Config, cfgP
 
   private val grpcClient = SpannerGrpcClientExtension(system.toTyped).clientFor(sharedConfigPath)
 
+  // https://cloud.google.com/spanner/docs/sql-best-practices#write_efficient_queries_for_range_key_lookup
+  private val EventsBySlicesRangeSql =
+    s"""SELECT ${Schema.Journal.Columns.mkString(",")}
+       |FROM ${settings.journalTable} 
+       |WHERE entity_type_hint = @entity_type_hint
+       |AND slice BETWEEN @min_slice AND @max_slice
+       |AND write_time >= @write_time 
+       |ORDER BY write_time, persistence_id, sequence_nr""".stripMargin
+
   private val EventsByTagSql =
     s"""SELECT ${SpannerJournalInteractions.Schema.Journal.Columns.map(column => s"j.$column").mkString(", ")}
        |FROM ${settings.eventTagTable} AS t JOIN ${settings.journalTable} AS j 
@@ -68,6 +78,66 @@ final class SpannerReadJournal(system: ExtendedActorSystem, config: Config, cfgP
 
   private val EventsForPersistenceIdSql =
     s"SELECT ${Schema.Journal.Columns.mkString(",")} FROM ${settings.journalTable} WHERE persistence_id = @persistence_id AND sequence_nr >= @from_sequence_Nr AND sequence_nr <= @to_sequence_nr ORDER BY sequence_nr"
+
+  def currentEventsBySlices(
+      entityTypeHint: String,
+      minSlice: Int,
+      maxSlice: Int,
+      offset: Offset
+  ): scaladsl.Source[EventEnvelope, NotUsed] = {
+    val spannerOffset = SpannerUtils.toSpannerOffset(offset)
+    if (log.isDebugEnabled())
+      log.debugN(
+        "Query slices between {} and {}, from {}. From offset {}",
+        minSlice,
+        maxSlice,
+        spannerOffset.commitTimestamp,
+        offset
+      )
+    grpcClient
+      .streamingQuery(
+        EventsBySlicesRangeSql,
+        params = Some(
+          Struct(
+            Map(
+              "entity_type_hint" -> Value(StringValue(entityTypeHint)),
+              "min_slice" -> Value(StringValue(minSlice.toString)),
+              "max_slice" -> Value(StringValue(maxSlice.toString)),
+              "write_time" -> Value(StringValue(spannerOffset.commitTimestamp))
+            )
+          )
+        ),
+        // FIXME define this Map in a val instead (similar in other places)
+        paramTypes = Map(
+          "entity_type_hint" -> Type(TypeCode.STRING),
+          "min_slice" -> Type(TypeCode.INT64),
+          "max_slice" -> Type(TypeCode.INT64),
+          "write_time" -> Type(TypeCode.TIMESTAMP)
+        )
+      )
+      .statefulMapConcat(deserializeAndAddOffset(spannerOffset))
+      .mapMaterializedValue(_ => NotUsed)
+  }
+
+  def eventsBySlices(
+      entityTypeHint: String,
+      minSlice: Int,
+      maxSlice: Int,
+      offset: Offset
+  ): Source[EventEnvelope, NotUsed] = {
+    val initialOffset = SpannerUtils.toSpannerOffset(offset)
+
+    def nextOffset(previousOffset: SpannerOffset, eventEnvelope: EventEnvelope): SpannerOffset =
+      eventEnvelope.offset.asInstanceOf[SpannerOffset]
+
+    ContinuousQuery[SpannerOffset, EventEnvelope](
+      initialOffset,
+      nextOffset,
+      offset => Some(currentEventsBySlices(entityTypeHint, minSlice, maxSlice, offset)),
+      1, // the same row comes back and is filtered due to how the offset works
+      settings.querySettings.refreshInterval
+    )
+  }
 
   override def currentEventsByTag(tag: String, offset: Offset): scaladsl.Source[EventEnvelope, NotUsed] = {
     val spannerOffset = SpannerUtils.toSpannerOffset(offset)

@@ -75,5 +75,8 @@ final class SpannerSettings(config: Config) {
   val sessionPool = new SessionPoolSettings(config.getConfig("session-pool"))
   val sessionAcquisitionTimeout = config.getDuration("session-acquisition-timeout").asScala
 
+  // FIXME config
+  val maxNumberOfSlices = 128
+
   val querySettings = new QuerySettings(config.getConfig("query"))
 }

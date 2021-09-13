@@ -20,9 +20,10 @@ import akka.util.ConstantFun
 import com.google.protobuf.struct.Value.Kind.StringValue
 import com.google.protobuf.struct.{ListValue, Struct, Value}
 import com.google.spanner.v1.{Mutation, Type, TypeCode}
-
 import scala.collection.immutable
 import scala.concurrent.{ExecutionContext, Future}
+
+import akka.persistence.typed.PersistenceId
 
 /**
  * INTERNAL API
@@ -48,6 +49,8 @@ private[spanner] object SpannerJournalInteractions {
         s"""CREATE TABLE ${settings.journalTable} (
            |  persistence_id STRING(MAX) NOT NULL,
            |  sequence_nr INT64 NOT NULL,
+           |  entity_type_hint STRING(MAX),
+           |  slice INT64,
            |  event BYTES(MAX),
            |  ser_id INT64 NOT NULL,
            |  ser_manifest STRING(MAX) NOT NULL,
@@ -55,11 +58,20 @@ private[spanner] object SpannerJournalInteractions {
            |  writer_uuid STRING(MAX) NOT NULL,
            |  meta BYTES(MAX),
            |  meta_ser_id INT64,
-           |  meta_ser_manifest STRING(MAX),
+           |  meta_ser_manifest STRING(MAX)
            |) PRIMARY KEY (persistence_id, sequence_nr)""".stripMargin
+
+      // FIXME verify performance of this index, it can't INTERLEAVE IN journal
+      // because then it would have to include persistence_id, sequence_nr and
+      // those are not part of the query
+      def sliceIndex(settings: SpannerSettings): String =
+        s"CREATE INDEX ${settings.journalTable}_slice " +
+        s"ON ${settings.journalTable}(entity_type_hint, slice, write_time) "
 
       val PersistenceId = "persistence_id" -> Type(TypeCode.STRING)
       val SeqNr = "sequence_nr" -> Type(TypeCode.INT64)
+      val EntityTypeHint = "entity_type_hint" -> Type(TypeCode.STRING)
+      val Slice = "slice" -> Type(TypeCode.INT64)
       val Event = "event" -> Type(TypeCode.BYTES)
       val SerId = "ser_id" -> Type(TypeCode.INT64)
       val SerManifest = "ser_manifest" -> Type(TypeCode.STRING)
@@ -70,8 +82,20 @@ private[spanner] object SpannerJournalInteractions {
       val MetaSerManifest = "meta_ser_manifest" -> Type(TypeCode.STRING)
 
       val Columns: immutable.Seq[String] =
-        List(PersistenceId, SeqNr, Event, SerId, SerManifest, WriteTime, WriterUUID, Meta, MetaSerId, MetaSerManifest)
-          .map(_._1)
+        List(
+          PersistenceId,
+          SeqNr,
+          EntityTypeHint,
+          Slice,
+          Event,
+          SerId,
+          SerManifest,
+          WriteTime,
+          WriterUUID,
+          Meta,
+          MetaSerId,
+          MetaSerManifest
+        ).map(_._1)
 
       val formatter = (new DateTimeFormatterBuilder)
         .appendOptional(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
@@ -96,6 +120,8 @@ private[spanner] object SpannerJournalInteractions {
         val iterator = values.iterator
         val persistenceId = iterator.next.getStringValue
         val sequenceNr = iterator.next.getStringValue.toLong
+        iterator.next.getStringValue // entityTypeHint
+        iterator.next.getStringValue // slice
         val payloadAsString = iterator.next.getStringValue
         val serId = iterator.next.getStringValue.toInt
         val serManifest = iterator.next.getStringValue
@@ -196,10 +222,14 @@ private[spanner] class SpannerJournalInteractions(
 
   def writeEvents(events: Seq[SerializedWrite]): Future[Unit] = {
     val mutations = events.flatMap { sw =>
+      val entityTypeHint = SliceUtils.extractEntityTypeHintFromPersistenceId(sw.persistenceId)
+      val slice = SliceUtils.sliceForPersistenceId(sw.persistenceId, journalSettings.maxNumberOfSlices)
       val columnValues =
         Vector(
           Value(StringValue(sw.persistenceId)),
           Value(StringValue(sw.sequenceNr.toString)), // ints and longs are StringValues :|
+          Value(StringValue(entityTypeHint)),
+          Value(StringValue(slice.toString)),
           Value(StringValue(sw.payload)),
           Value(StringValue(sw.serId.toString)),
           Value(StringValue(sw.serManifest)),
