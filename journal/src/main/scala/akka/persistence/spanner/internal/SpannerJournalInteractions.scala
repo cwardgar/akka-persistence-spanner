@@ -61,12 +61,14 @@ private[spanner] object SpannerJournalInteractions {
            |  meta_ser_manifest STRING(MAX)
            |) PRIMARY KEY (persistence_id, sequence_nr)""".stripMargin
 
+      // FIXME shall include slice, entity_type_hint as first part of primary key, to collocate with slice index?
+
       // FIXME verify performance of this index, it can't INTERLEAVE IN journal
       // because then it would have to include persistence_id, sequence_nr and
       // those are not part of the query
       def sliceIndex(settings: SpannerSettings): String =
         s"CREATE INDEX ${settings.journalTable}_slice " +
-        s"ON ${settings.journalTable}(entity_type_hint, slice, write_time) "
+        s"ON ${settings.journalTable}(slice, entity_type_hint, write_time)"
 
       val PersistenceId = "persistence_id" -> Type(TypeCode.STRING)
       val SeqNr = "sequence_nr" -> Type(TypeCode.INT64)

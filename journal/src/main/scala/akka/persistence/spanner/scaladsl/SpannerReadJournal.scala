@@ -59,7 +59,7 @@ final class SpannerReadJournal(system: ExtendedActorSystem, config: Config, cfgP
   // https://cloud.google.com/spanner/docs/sql-best-practices#write_efficient_queries_for_range_key_lookup
   private val EventsBySlicesRangeSql =
     s"""SELECT ${Schema.Journal.Columns.mkString(",")}
-       |FROM ${settings.journalTable} 
+       |FROM ${settings.journalTable}@{FORCE_INDEX=${settings.journalTable}_slice}
        |WHERE entity_type_hint = @entity_type_hint
        |AND slice BETWEEN @min_slice AND @max_slice
        |AND write_time >= @write_time 
