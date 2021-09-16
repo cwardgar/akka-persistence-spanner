@@ -1,31 +1,35 @@
+/*
+ * Copyright 2021 Lightbend Inc.
+ */
+
 package akka.persistence.spanner.example
 
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.LoggerOps
 import akka.dispatch.ExecutionContexts
-import akka.persistence.query.{ EventEnvelope, NoOffset, Offset, PersistenceQuery }
+import akka.persistence.query.{EventEnvelope, NoOffset, Offset, PersistenceQuery}
 import akka.persistence.spanner.SpannerOffset
 import akka.persistence.spanner.internal.SpannerGrpcClientExtension
 import akka.persistence.spanner.scaladsl.SpannerReadJournal
 import akka.persistence.typed.PersistenceId
 import akka.stream.SharedKillSwitch
-import akka.stream.scaladsl.{ RestartSource, Sink, Source }
-import akka.{ Done, NotUsed }
+import akka.stream.scaladsl.{RestartSource, Sink, Source}
+import akka.{Done, NotUsed}
 import com.google.protobuf.struct.Value.Kind
-import com.google.protobuf.struct.{ ListValue, Struct, Value }
+import com.google.protobuf.struct.{ListValue, Struct, Value}
 import com.google.protobuf.struct.Value.Kind.StringValue
-import com.google.spanner.v1.{ Mutation, Type, TypeCode }
+import com.google.spanner.v1.{Mutation, Type, TypeCode}
 import org.HdrHistogram.Histogram
-import org.slf4j.{ Logger, LoggerFactory }
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
 object EventProcessorStream {
   object Schema {
-    val offsetStoreTableName = "offsets"
+    val offsetStoreTableName = "test_offsets"
 
     def offsetStoreTable(): String =
       s"""
@@ -57,7 +61,10 @@ class EventProcessorStream[Event: ClassTag](
     system: ActorSystem[_],
     executionContext: ExecutionContext,
     eventProcessorId: String,
-    tag: String) {
+    tag: String,
+    minSlice: Int,
+    maxSlice: Int
+) {
   protected val log: Logger = LoggerFactory.getLogger(getClass)
   implicit val sys: ActorSystem[_] = system
   implicit val ec: ExecutionContext = executionContext
@@ -73,21 +80,31 @@ class EventProcessorStream[Event: ClassTag](
       .withBackoff(minBackoff = 500.millis, maxBackoff = 20.seconds, randomFactor = 0.1) { () =>
         Source.futureSource {
           readOffset().map { offset =>
-            log.infoN("Starting stream for tag [{}] from offset [{}]", tag, offset)
-            processEventsByTag(offset, histogram)
-            // groupedWithin can be used here to improve performance by reducing number of offset writes,
-            // with the trade-off of possibility of more duplicate events when stream is restarted
-              .mapAsync(1)(writeOffset)
+            queryAndProcess(offset, histogram)
+              .groupedWithin(1000, 1.second)
+              // groupedWithin is used here to improve performance by reducing number of offset writes,
+              // with the trade-off of possibility of more duplicate events when stream is restarted
+              .mapAsync(1)(offsets => writeOffset(offsets.last))
           }
         }
       }
       .via(killSwitch.flow)
       .runWith(Sink.ignore)
 
-  private def processEventsByTag(offset: Offset, histogram: Histogram): Source[Offset, NotUsed] =
-    query
-      .eventsByTag(tag, offset)
-      .statefulMapConcat { () =>
+  private def queryAndProcess(offset: Offset, histogram: Histogram): Source[Offset, NotUsed] =
+    if (tag == "") {
+      log.infoN("Starting stream for slice range [{}] to [{}]  from offset [{}]", minSlice, maxSlice, offset)
+      val q: Source[EventEnvelope, NotUsed] =
+        query.eventsBySlices(ConfigurablePersistentActor.Key.name, minSlice, maxSlice, offset)
+      processEvents(q, histogram)
+    } else {
+      log.infoN("Starting stream for tag [{}] from offset [{}]", tag, offset)
+      val q: Source[EventEnvelope, NotUsed] = query.eventsByTag(tag, offset)
+      processEvents(q, histogram)
+    }
+
+  private def processEvents(q: Source[EventEnvelope, NotUsed], histogram: Histogram): Source[Offset, NotUsed] =
+    q.statefulMapConcat { () =>
         val previous = mutable.HashMap[String, EventEnvelope]()
         var counter = 0L
 
@@ -109,7 +126,8 @@ class EventProcessorStream[Event: ClassTag](
           case event: Event => {
             // Times from different nodes, take with a pinch of salt
             val latency = System.currentTimeMillis() - eventEnvelope.timestamp
-            if (latency < histogram.getMaxValue)
+            // milliseconds, 1 minute
+            if (latency < 60000)
               histogram.recordValue(latency)
             else log.warn("Filtering out latency [{}] for [{}] to not break histogram", latency, eventEnvelope)
             log.debugN(
@@ -118,7 +136,8 @@ class EventProcessorStream[Event: ClassTag](
               event,
               PersistenceId.ofUniqueId(eventEnvelope.persistenceId),
               eventEnvelope.sequenceNr,
-              latency)
+              latency
+            )
             eventEnvelope.offset
           }
           case other =>
@@ -126,13 +145,18 @@ class EventProcessorStream[Event: ClassTag](
         }
       }
 
+  private val offsetTag =
+    if (tag == "") s"slice-$minSlice-$maxSlice"
+    else tag
+
   private def readOffset(): Future[Offset] =
     grpcClient
       .withSession { implicit session =>
         grpcClient.executeQuery(
           Schema.offsetQuery,
-          Schema.offsetQueryParams(eventProcessorId, tag),
-          Schema.offsetQueryParamTypes)
+          Schema.offsetQueryParams(eventProcessorId, offsetTag),
+          Schema.offsetQueryParamTypes
+        )
       }
       .map { rs =>
         if (rs.rows.isEmpty) startOffset()
@@ -164,16 +188,31 @@ class EventProcessorStream[Event: ClassTag](
       case SpannerOffset(commitTimestamp, seen) =>
         grpcClient
           .withSession { implicit session =>
-            grpcClient.write(Seq(Mutation(Mutation.Operation.InsertOrUpdate(Mutation.Write(
-              Schema.offsetStoreTableName,
-              Schema.Columns,
-              Seq(ListValue(Seq(
-                Value(StringValue(eventProcessorId)),
-                Value(StringValue(tag)),
-                Value(StringValue(commitTimestamp)),
-                Value(Kind.ListValue(ListValue(seen.map {
-                  case (pid, seqnr) => Value(StringValue(s"$pid:$seqnr"))
-                }.toSeq)))))))))))
+            grpcClient.write(
+              Seq(
+                Mutation(
+                  Mutation.Operation.InsertOrUpdate(
+                    Mutation.Write(
+                      Schema.offsetStoreTableName,
+                      Schema.Columns,
+                      Seq(
+                        ListValue(
+                          Seq(
+                            Value(StringValue(eventProcessorId)),
+                            Value(StringValue(offsetTag)),
+                            Value(StringValue(commitTimestamp)),
+                            Value(Kind.ListValue(ListValue(seen.map {
+                              case (pid, seqnr) =>
+                                Value(StringValue(s"$pid:$seqnr"))
+                            }.toSeq)))
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
           }
           .map(_ => Done)(ExecutionContexts.parasitic)
 

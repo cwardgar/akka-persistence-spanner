@@ -1,3 +1,7 @@
+/*
+ * Copyright 2021 Lightbend Inc.
+ */
+
 package akka.persistence.spanner.example
 
 import akka.Done
@@ -13,7 +17,6 @@ import com.google.auth.oauth2.GoogleCredentials
 import com.google.spanner.admin.database.v1.{CreateDatabaseRequest, DatabaseAdminClient}
 import com.google.spanner.admin.instance.v1.{CreateInstanceRequest, InstanceAdminClient}
 import io.grpc.auth.MoreCallCredentials
-
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -21,8 +24,9 @@ object Main {
   def main(args: Array[String]): Unit =
     ActorSystem(
       Behaviors.setup[Any] { ctx =>
+        printDdl(ctx.system)
         val cluster = Cluster(ctx.system)
-        ctx.log.info("Starting up example")
+        ctx.log.info("Starting up example with roles [{}]", cluster.selfMember.roles.mkString(", "))
         if (cluster.selfMember.hasRole("write")) {
           // note: this creates offset store as well
           ctx.pipeToSelf(initSpannerInstance(ctx.system))(identity)
@@ -53,13 +57,27 @@ object Main {
             if (cluster.selfMember.hasRole("load")) {
               ctx.log.info("Starting load generation")
               val load = ctx.spawn(LoadGenerator(loadSettings, ref), "load-generator")
-              load ! LoadGenerator.Start(10.seconds)
+              load ! LoadGenerator.Start(60.seconds)
             }
             Behaviors.empty
         }
       },
-      "apc-example"
+      "spanner-test"
     )
+
+  def printDdl(system: ActorSystem[_]): Unit = {
+    val spannerSettings = new SpannerSettings(system.settings.config.getConfig("akka.persistence.spanner"))
+    val statements =
+      SpannerJournalInteractions.Schema.Journal.journalTable(spannerSettings) ::
+      SpannerJournalInteractions.Schema.Journal.sliceIndex(spannerSettings) ::
+      SpannerJournalInteractions.Schema.Tags.tagTable(spannerSettings) ::
+      SpannerJournalInteractions.Schema.Tags.eventsByTagIndex(spannerSettings) ::
+      SpannerJournalInteractions.Schema.Deleted.deleteMetadataTable(spannerSettings) ::
+      SpannerSnapshotInteractions.Schema.Snapshots.snapshotTable(spannerSettings) ::
+      EventProcessorStream.Schema.offsetStoreTable() ::
+      Nil
+    println(statements.mkString("Create tables:\n\n", ";\n\n", ";\n\n"))
+  }
 
   def initSpannerInstance(system: ActorSystem[_]): Future[Done] = {
     val spannerSettings = new SpannerSettings(system.settings.config.getConfig("akka.persistence.spanner"))

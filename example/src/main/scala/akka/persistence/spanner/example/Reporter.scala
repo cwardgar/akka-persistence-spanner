@@ -1,3 +1,7 @@
+/*
+ * Copyright 2021 Lightbend Inc.
+ */
+
 package akka.persistence.spanner.example
 
 import akka.actor.typed.{ActorRef, Behavior}
