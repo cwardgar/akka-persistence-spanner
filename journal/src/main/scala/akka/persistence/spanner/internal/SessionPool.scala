@@ -14,8 +14,9 @@ import akka.util.PrettyDuration._
 import com.google.spanner.v1._
 import io.grpc.StatusRuntimeException
 import org.slf4j.LoggerFactory
-
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 import scala.concurrent.Promise
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
@@ -138,10 +139,8 @@ private[spanner] object SessionPool {
             if (ctx.log.isInfoEnabled) {
               ctx.log.info("All sessions returned. Shutting down. {}", newSessions.map(_.name))
             }
-            Behaviors.stopped(() => {
-              cleanupOldSessions(client, newSessions)
-              done.tryComplete(Success(Done))
-            })
+            done.tryCompleteWith(cleanupOldSessions(client, newSessions)(ctx.executionContext))
+            Behaviors.stopped
           } else {
             ctx.log.info("Still waiting on sessions to return: {}", newRemaining.keys)
             shuttingDown(done, client, newSessions, newRemaining)
@@ -151,17 +150,19 @@ private[spanner] object SessionPool {
           if (ctx.log.isInfoEnabled) {
             ctx.log.info("Timed out waiting for sessions to be returned. Shutting down now. {}", toShutdown.map(_.name))
           }
-          Behaviors.stopped(() => {
-            cleanupOldSessions(client, toShutdown)
-            done.tryComplete(Success(Done))
-          })
+          done.tryCompleteWith(cleanupOldSessions(client, toShutdown)(ctx.executionContext))
+          Behaviors.stopped
       }
     }
 
-  private def cleanupOldSessions(client: SpannerClient, sessions: Seq[Session]): Unit =
-    sessions.foreach { session =>
-      client.deleteSession(DeleteSessionRequest(session.name))
-    }
+  private def cleanupOldSessions(client: SpannerClient, sessions: List[Session])(
+      implicit ec: ExecutionContext
+  ): Future[Done] =
+    Future
+      .sequence(sessions.map { session =>
+        client.deleteSession(DeleteSessionRequest(session.name))
+      })
+      .map(_ => Done)
 }
 
 /**
@@ -335,10 +336,10 @@ private[spanner] final class SessionPool(
 
   override def onSignal: PartialFunction[Signal, Behavior[Command]] = {
     case PostStop =>
-      cleanupOldSessions(client, availableSessions.map(_.session).toList ++ inUseSessions.values)
+      cleanupOldSessions(client, availableSessions.map(_.session).toList ++ inUseSessions.values)(ctx.executionContext)
       Behaviors.same
     case PreRestart =>
-      cleanupOldSessions(client, availableSessions.map(_.session).toList ++ inUseSessions.values)
+      cleanupOldSessions(client, availableSessions.map(_.session).toList ++ inUseSessions.values)(ctx.executionContext)
       Behaviors.same
   }
 

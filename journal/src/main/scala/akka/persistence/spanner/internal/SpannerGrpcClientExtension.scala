@@ -40,8 +40,10 @@ final class SpannerGrpcClientExtension(system: ActorSystem[_]) extends Extension
   private implicit val classic = system.toClassic
   private implicit val ec: ExecutionContext = system.executionContext
 
+  // must be before the phase "before-actor-system-terminate" because akka-grpc close all clients in
+  // "before-actor-system-terminate"
   CoordinatedShutdown(system.toClassic)
-    .addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "shutdown-spanner-grpc-clients") { () =>
+    .addTask(CoordinatedShutdown.PhaseClusterShutdown, "shutdown-spanner-grpc-clients") { () =>
       Future.traverse(sessions.values().asScala)(_.shutdown()).map(_ => Done)
     }
 
