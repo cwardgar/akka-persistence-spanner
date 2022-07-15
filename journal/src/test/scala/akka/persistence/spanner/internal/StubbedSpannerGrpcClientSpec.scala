@@ -15,7 +15,10 @@ import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.struct.Struct
-import com.google.spanner.v1._
+import com.google.spanner.v1.mutation.Mutation.Mutation
+import com.google.spanner.v1.result_set._
+import com.google.spanner.v1.spanner._
+import com.google.spanner.v1.transaction.Transaction
 import io.grpc.{Status, StatusRuntimeException}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -136,10 +139,8 @@ class StubbedSpannerGrpcClientSpec
     "request session to re-recreated if session NOT_FOUND during streaming query" in {
       val pool = createTestProbe[SessionPool.Command]
       val fakeClient = new AbstractStubbedSpannerClient {
-        override def executeStreamingSql(
-            in: com.google.spanner.v1.ExecuteSqlRequest
-        ): Source[com.google.spanner.v1.PartialResultSet, akka.NotUsed] =
-          Source.failed[com.google.spanner.v1.PartialResultSet](
+        override def executeStreamingSql(in: ExecuteSqlRequest): Source[PartialResultSet, akka.NotUsed] =
+          Source.failed[PartialResultSet](
             Status.fromCode(Status.Code.NOT_FOUND).withDescription("Session not found").asRuntimeException()
           )
       }

@@ -22,11 +22,11 @@ import com.google.protobuf.struct.ListValue
 import com.google.protobuf.struct.Struct
 import com.google.protobuf.struct.Value
 import com.google.protobuf.struct.Value.Kind.StringValue
-import com.google.spanner.v1.KeySet
-import com.google.spanner.v1.Mutation
-import com.google.spanner.v1.ReadRequest
-import com.google.spanner.v1.Type
-import com.google.spanner.v1.TypeCode
+import com.google.spanner.v1.keys.KeySet
+import com.google.spanner.v1.mutation.Mutation.Mutation
+import com.google.spanner.v1.spanner.ReadRequest
+import com.google.spanner.v1.`type`.Type
+import com.google.spanner.v1.`type`.TypeCode
 import io.grpc.Status
 import io.grpc.StatusRuntimeException
 

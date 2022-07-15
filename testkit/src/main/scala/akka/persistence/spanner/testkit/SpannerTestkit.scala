@@ -10,8 +10,12 @@ import akka.grpc.GrpcClientSettings
 import akka.persistence.spanner.SpannerSettings
 import akka.persistence.spanner.internal.{SpannerJournalInteractions, SpannerSnapshotInteractions}
 import com.google.auth.oauth2.GoogleCredentials
-import com.google.spanner.admin.database.v1.{CreateDatabaseRequest, DatabaseAdminClient, DropDatabaseRequest}
-import com.google.spanner.admin.instance.v1.{CreateInstanceRequest, InstanceAdminClient}
+import com.google.spanner.admin.database.v1.spanner_database_admin.{
+  CreateDatabaseRequest,
+  DatabaseAdminClient,
+  DropDatabaseRequest
+}
+import com.google.spanner.admin.instance.v1.spanner_instance_admin.{CreateInstanceRequest, InstanceAdminClient}
 import com.typesafe.config.Config
 import io.grpc.auth.MoreCallCredentials
 

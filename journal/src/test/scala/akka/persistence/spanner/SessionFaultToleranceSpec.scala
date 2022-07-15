@@ -7,7 +7,7 @@ package akka.persistence.spanner
 import akka.Done
 import akka.persistence.spanner.TestActors.Persister
 import akka.persistence.spanner.internal.SpannerGrpcClientExtension
-import com.google.spanner.v1.DeleteSessionRequest
+import com.google.spanner.v1.spanner.DeleteSessionRequest
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 

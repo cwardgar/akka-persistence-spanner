@@ -11,7 +11,8 @@ import akka.persistence.spanner.SpannerSettings
 import akka.persistence.spanner.internal.SessionPool._
 import akka.persistence.spanner.internal.SessionPoolStubbedSpec._
 import com.google.protobuf.empty.Empty
-import com.google.spanner.v1._
+import com.google.spanner.v1.result_set.ResultSet
+import com.google.spanner.v1.spanner._
 import com.typesafe.config.ConfigFactory
 import io.grpc.{Status, StatusRuntimeException}
 import org.scalatest.matchers.should.Matchers

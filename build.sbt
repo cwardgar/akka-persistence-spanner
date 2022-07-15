@@ -90,7 +90,9 @@ lazy val journal = project
             suffixFileFilter("google/protobuf/timestamp.proto") ||
             suffixFileFilter("google/protobuf/type.proto") ||
             suffixFileFilter("google/protobuf/wrappers.proto")
-        )
+        ),
+    // Fix for https://github.com/akka/akka-persistence-spanner/issues/213
+    akkaGrpcCodeGeneratorSettings ~= { _.filterNot(_ == "flat_package") }
   )
 
 lazy val testkit = project

@@ -7,7 +7,9 @@ package akka.persistence.spanner.internal
 import akka.stream.scaladsl.Source
 import akka.{Done, NotUsed}
 import com.google.protobuf.empty.Empty
-import com.google.spanner.v1._
+import com.google.spanner.v1.result_set._
+import com.google.spanner.v1.spanner._
+import com.google.spanner.v1.transaction.Transaction
 
 import scala.concurrent.Future
 

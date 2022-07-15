@@ -24,7 +24,7 @@ import akka.stream.scaladsl
 import akka.stream.scaladsl.Source
 import com.google.protobuf.struct.Value.Kind.StringValue
 import com.google.protobuf.struct.{Struct, Value}
-import com.google.spanner.v1.{Type, TypeCode}
+import com.google.spanner.v1.`type`.{Type, TypeCode}
 import com.typesafe.config.Config
 import org.slf4j.LoggerFactory
 

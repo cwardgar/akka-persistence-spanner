@@ -16,7 +16,8 @@ import akka.serialization.{Serialization, SerializationExtension, Serializers}
 import com.google.protobuf.struct.Value.Kind
 import com.google.protobuf.struct.Value.Kind.StringValue
 import com.google.protobuf.struct.{ListValue, Struct, Value}
-import com.google.spanner.v1.{Mutation, Type, TypeCode}
+import com.google.spanner.v1.`type`.{Type, TypeCode}
+import com.google.spanner.v1.mutation.Mutation.Mutation
 import io.grpc.{Status, StatusRuntimeException}
 import org.slf4j.LoggerFactory
 

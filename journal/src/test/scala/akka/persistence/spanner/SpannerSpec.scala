@@ -18,14 +18,9 @@ import akka.persistence.spanner.internal.{
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.protobuf.struct.ListValue
 import com.google.protobuf.struct.Value.Kind
-import com.google.spanner.admin.database.v1.{
-  CreateDatabaseRequest,
-  DatabaseAdminClient,
-  DropDatabaseRequest,
-  GetDatabaseRequest
-}
-import com.google.spanner.admin.instance.v1.{CreateInstanceRequest, InstanceAdminClient}
-import com.google.spanner.v1.{CreateSessionRequest, DeleteSessionRequest, ExecuteSqlRequest, SpannerClient}
+import com.google.spanner.admin.database.v1.spanner_database_admin._
+import com.google.spanner.admin.instance.v1.spanner_instance_admin._
+import com.google.spanner.v1.spanner._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.grpc.Status.Code
 import io.grpc.StatusRuntimeException

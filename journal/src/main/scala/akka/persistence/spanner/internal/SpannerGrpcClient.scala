@@ -18,9 +18,13 @@ import akka.util.{ConstantFun, Timeout}
 import akka.{Done, NotUsed}
 import com.google.protobuf.ByteString
 import com.google.protobuf.struct.{Struct, Value}
-import com.google.rpc.Code
-import com.google.spanner.v1.CommitRequest.Transaction
-import com.google.spanner.v1._
+import com.google.rpc.code.Code
+import com.google.spanner.v1.`type`.Type
+import com.google.spanner.v1.mutation.Mutation.Mutation
+import com.google.spanner.v1.result_set.ResultSet
+import com.google.spanner.v1.spanner.CommitRequest.Transaction
+import com.google.spanner.v1.spanner._
+import com.google.spanner.v1.transaction._
 import io.grpc.StatusRuntimeException
 import org.slf4j.LoggerFactory
 

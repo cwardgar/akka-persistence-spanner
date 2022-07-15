@@ -11,7 +11,7 @@ import akka.annotation.InternalApi
 import akka.persistence.spanner.SpannerSettings
 import akka.persistence.spanner.internal.SessionPool._
 import akka.util.PrettyDuration._
-import com.google.spanner.v1._
+import com.google.spanner.v1.spanner._
 import io.grpc.StatusRuntimeException
 import org.slf4j.LoggerFactory
 import scala.collection.mutable

@@ -9,7 +9,8 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.testkit.TestKit
 import com.google.protobuf.struct.Value.Kind
 import com.google.protobuf.struct.{ListValue, Value}
-import com.google.spanner.v1.{PartialResultSet, ResultSetMetadata, StructType}
+import com.google.spanner.v1.`type`.StructType
+import com.google.spanner.v1.result_set._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike

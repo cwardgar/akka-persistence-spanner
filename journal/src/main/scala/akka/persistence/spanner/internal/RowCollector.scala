@@ -11,7 +11,7 @@ import akka.util.OptionVal
 import akka.actor.typed.scaladsl.LoggerOps
 import com.google.protobuf.struct.Value.Kind
 import com.google.protobuf.struct.{ListValue, Value}
-import com.google.spanner.v1.PartialResultSet
+import com.google.spanner.v1.result_set.PartialResultSet
 import org.slf4j.LoggerFactory
 
 /**

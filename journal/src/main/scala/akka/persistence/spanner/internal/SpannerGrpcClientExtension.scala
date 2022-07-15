@@ -5,7 +5,6 @@
 package akka.persistence.spanner.internal
 
 import java.util.concurrent.ConcurrentHashMap
-
 import akka.Done
 import akka.actor.CoordinatedShutdown
 import akka.actor.typed.scaladsl.adapter._
@@ -15,7 +14,7 @@ import akka.annotation.InternalStableApi
 import akka.grpc.GrpcClientSettings
 import akka.persistence.spanner.SpannerSettings
 import com.google.auth.oauth2.GoogleCredentials
-import com.google.spanner.v1.SpannerClient
+import com.google.spanner.v1.spanner.SpannerClient
 import io.grpc.auth.MoreCallCredentials
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters._
